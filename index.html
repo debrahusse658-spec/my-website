@@ -1039,6 +1039,36 @@
     </style>
 </head>
 <body>
+    <!-- Startup App Lock Screen Overlay -->
+    <div id="app-lock-screen" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-gradient); justify-content: center; align-items: center; z-index: 999999; backdrop-filter: blur(20px); transition: opacity 0.3s ease;">
+        <div class="glass-card" style="width: 360px; padding: 2.5rem; text-align: center; display: flex; flex-direction: column; gap: 1.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); border: 1px solid var(--card-border);">
+            <div>
+                <h2 style="font-size: 1.5rem; color: white; font-weight: 800; margin-bottom: 0.5rem; font-family: var(--font-main);">🔒 성도섬김마스터</h2>
+                <p style="font-size: 0.85rem; color: var(--text-secondary);">시스템 보호를 위해 비밀번호를 입력해 주세요.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; text-align: left;">
+                <input type="password" id="lock-password-input" class="form-control" placeholder="비밀번호 입력" style="text-align: center; font-size: 1.1rem; letter-spacing: 0.2rem;" onkeydown="if(event.key === 'Enter') unlockApp()">
+                <div id="lock-error-msg" style="color: var(--danger); font-size: 0.75rem; text-align: center; display: none; margin-top: 0.25rem;">❌ 비밀번호가 올바르지 않습니다.</div>
+            </div>
+            <button class="btn btn-primary" style="width: 100%; font-weight: 700; padding: 0.75rem;" onclick="unlockApp()">잠금 해제</button>
+        </div>
+    </div>
+    <script>
+        (function() {
+            const pwd = localStorage.getItem('ssm_app_password');
+            const unlocked = sessionStorage.getItem('ssm_unlocked');
+            if (pwd && pwd.trim().length > 0 && unlocked !== 'true') {
+                const lockScreen = document.getElementById('app-lock-screen');
+                if (lockScreen) {
+                    lockScreen.style.display = 'flex';
+                    window.addEventListener('DOMContentLoaded', () => {
+                        const input = document.getElementById('lock-password-input');
+                        if (input) input.focus();
+                    });
+                }
+            }
+        })();
+    </script>
     <!-- Sidebar Overlay Backdrop for Mobile -->
     <div id="sidebar-overlay" onclick="toggleMobileSidebar()" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.4); z-index: 98; backdrop-filter: blur(2px);"></div>
 
@@ -1496,6 +1526,19 @@
                     </div>
 
                     <button class="btn btn-accent" style="width: 100%; margin-top: 0.5rem; font-weight:700;" onclick="saveApiSettings()">💾 설정값 영구 저장</button>
+                </div>
+
+                <!-- App Password Settings -->
+                <div class="glass-card" style="display:flex; flex-direction:column; gap:1.25rem; margin-top: 1.5rem;">
+                    <h3 style="font-size: 1.1rem; color: white; border-bottom: 1px solid var(--card-border); padding-bottom: 0.5rem;">🔒 앱 잠금 비밀번호 설정</h3>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5;">
+                        성도마스터 실행 시 화면을 잠그고 비밀번호 입력을 요구합니다. 비밀번호를 비워두고 저장하시면 잠금 기능이 해제됩니다.
+                    </p>
+                    <div class="form-group">
+                        <label for="setting-app-password">접속 비밀번호 (비워두면 해제)</label>
+                        <input type="password" id="setting-app-password" class="form-control" placeholder="비밀번호 입력">
+                    </div>
+                    <button class="btn btn-accent" style="width: 100%; font-weight:700;" onclick="saveAppPassword()">💾 비밀번호 저장</button>
                 </div>
 
                 <!-- Backup & Obsidian Data Export -->
@@ -2103,6 +2146,8 @@
                             fellowships: fellowships,
                             groups: groups
                         });
+                    } else if (key === 'ssm_app_password') {
+                        pushDataToFirebase('appPassword', val);
                     }
                 }
             },
@@ -2216,6 +2261,16 @@
                     renderChatbotHistory();
                 } else {
                     firebaseDb.ref('chatHistory').set(chatHistory);
+                }
+            });
+
+            // Listen for app password changes
+            firebaseDb.ref('appPassword').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data !== null) {
+                    isSyncingFromFirebase = true;
+                    safeStorage.setItem('ssm_app_password', data);
+                    isSyncingFromFirebase = false;
                 }
             });
 
@@ -2371,6 +2426,11 @@
             const firebaseUr = safeStorage.getItem('ssm_firebase_url');
             if (firebaseUr) {
                 document.getElementById('setting-firebase-url').value = firebaseUr;
+            }
+
+            const appPassword = safeStorage.getItem('ssm_app_password');
+            if (appPassword) {
+                document.getElementById('setting-app-password').value = appPassword;
             }
 
             // Load Chat History
@@ -4223,6 +4283,35 @@ ${content}
 
             // Re-initialize Firebase if database URL changed
             initFirebaseEngine();
+        }
+
+        function saveAppPassword() {
+            const input = document.getElementById('setting-app-password');
+            const pwd = input.value.trim();
+            safeStorage.setItem('ssm_app_password', pwd);
+            alert('비밀번호 설정이 완료되었습니다. 페이지를 새로고침하여 적용합니다.');
+            location.reload();
+        }
+
+        function unlockApp() {
+            const input = document.getElementById('lock-password-input');
+            const errorMsg = document.getElementById('lock-error-msg');
+            const pwd = safeStorage.getItem('ssm_app_password') || '';
+            
+            if (input.value === pwd) {
+                sessionStorage.setItem('ssm_unlocked', 'true');
+                const lockScreen = document.getElementById('app-lock-screen');
+                if (lockScreen) {
+                    lockScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        lockScreen.style.display = 'none';
+                    }, 300);
+                }
+            } else {
+                errorMsg.style.display = 'block';
+                input.value = '';
+                input.focus();
+            }
         }
 
         // ==========================================
