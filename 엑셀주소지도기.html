@@ -577,6 +577,7 @@
 
             const bounds = new kakao.maps.LatLngBounds();
             let successCount = 0;
+            const coordsRegistry = {};
 
             for (let i = 0; i < parsedData.length; i++) {
                 const item = parsedData[i];
@@ -584,8 +585,27 @@
                 
                 try {
                     const coords = await geocodeAddressPromise(item.address);
-                    item.lat = coords.lat;
-                    item.lng = coords.lng;
+                    
+                    let finalLat = coords.lat;
+                    let finalLng = coords.lng;
+                    
+                    const coordKey = finalLat.toFixed(6) + ',' + finalLng.toFixed(6);
+                    if (coordsRegistry[coordKey]) {
+                        const count = coordsRegistry[coordKey];
+                        coordsRegistry[coordKey] = count + 1;
+                        
+                        const angle = (count * 2 * Math.PI) / 8;
+                        const ring = Math.floor(count / 8) + 1;
+                        const radius = 0.00007 * ring; 
+                        
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    } else {
+                        coordsRegistry[coordKey] = 1;
+                    }
+                    
+                    item.lat = finalLat;
+                    item.lng = finalLng;
                     
                     // Create pin
                     const markerPosition = new kakao.maps.LatLng(item.lat, item.lng);

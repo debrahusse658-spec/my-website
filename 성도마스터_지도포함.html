@@ -6120,6 +6120,7 @@ ${m.notes || '등록된 메모가 없습니다.'}
             const bounds = new kakao.maps.LatLngBounds();
             let successCount = 0;
             let databaseUpdated = false;
+            const coordsRegistry = {};
 
             for (let i = 0; i < filtered.length; i++) {
                 const m = filtered[i];
@@ -6155,7 +6156,25 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     }
                 }
 
-                const position = new kakao.maps.LatLng(lat, lng);
+                // Dynamic Jitter for display
+                let displayLat = lat;
+                let displayLng = lng;
+                const coordKey = lat.toFixed(6) + ',' + lng.toFixed(6);
+                if (coordsRegistry[coordKey]) {
+                    const count = coordsRegistry[coordKey];
+                    coordsRegistry[coordKey] = count + 1;
+                    
+                    const angle = (count * 2 * Math.PI) / 8;
+                    const ring = Math.floor(count / 8) + 1;
+                    const radius = 0.00007 * ring; 
+                    
+                    displayLat = lat + (Math.cos(angle) * radius);
+                    displayLng = lng + (Math.sin(angle) * radius);
+                } else {
+                    coordsRegistry[coordKey] = 1;
+                }
+
+                const position = new kakao.maps.LatLng(displayLat, displayLng);
                 const markerColor = getParishColor(m.parish);
                 const markerImage = new kakao.maps.MarkerImage(
                     `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="${encodeURIComponent(markerColor)}" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="white"/></svg>`,
