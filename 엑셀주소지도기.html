@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>엑셀 주소 지도 변환기 - Standalone Utility</title>
+    <!-- SheetJS Excel Library -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Google Fonts: Outfit and Noto Sans KR -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-gradient: linear-gradient(135deg, #0e0b1f 0%, #161032 50%, #07050e 100%);
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.05);
+            --card-hover: rgba(255, 255, 255, 0.06);
+            --primary: #8b5cf6;
+            --primary-glow: rgba(139, 92, 246, 0.35);
+            --primary-hover: #a78bfa;
+            --accent: #10b981;
+            --accent-glow: rgba(16, 185, 129, 0.3);
+            --danger: #f43f5e;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --font-main: 'Outfit', 'Noto Sans KR', sans-serif;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body.light-theme {
+            --bg-gradient: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%);
+            --card-bg: rgba(255, 255, 255, 0.75);
+            --card-border: rgba(0, 0, 0, 0.08);
+            --card-hover: rgba(255, 255, 255, 0.95);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            background: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+
+        /* Layout */
+        .sidebar {
+            width: 380px;
+            height: 100vh;
+            background: rgba(10, 8, 22, 0.6);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--card-border);
+            display: flex;
+            flex-direction: column;
+            padding: 1.5rem;
+            gap: 1.5rem;
+            z-index: 10;
+            overflow-y: auto;
+        }
+        body.light-theme .sidebar {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .map-container {
+            flex: 1;
+            height: 100vh;
+            position: relative;
+            background: #110e24;
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 1.25rem;
+            transition: var(--transition);
+        }
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.1);
+            background: var(--card-hover);
+        }
+        body.light-theme .glass-card:hover {
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+
+        h2 {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        p.desc {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-top: 0.25rem;
+        }
+
+        /* Inputs & Buttons */
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            margin-top: 0.75rem;
+        }
+
+        label {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+            font-family: var(--font-main);
+            transition: var(--transition);
+        }
+        body.light-theme .form-control {
+            background: rgba(0, 0, 0, 0.03);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-glow);
+        }
+
+        .btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.6rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        .btn:hover {
+            background: var(--primary-hover);
+            box-shadow: 0 0 15px var(--primary-glow);
+            transform: translateY(-1px);
+        }
+        .btn-accent {
+            background: var(--accent);
+        }
+        .btn-accent:hover {
+            background: #059669;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed var(--card-border);
+            border-radius: 12px;
+            padding: 2rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: var(--transition);
+            background: rgba(255, 255, 255, 0.01);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(139, 92, 246, 0.05);
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-top: 1rem;
+            display: none;
+        }
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.4rem;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: 4px;
+            transition: width 0.1s ease;
+        }
+
+        /* List Area */
+        .list-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            overflow: hidden;
+        }
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .search-wrapper {
+            position: relative;
+        }
+        .list-items {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            padding-right: 0.25rem;
+        }
+        .list-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        body.light-theme .list-item {
+            background: rgba(0, 0, 0, 0.02);
+        }
+        .list-item:hover {
+            background: var(--card-hover);
+            border-color: var(--primary);
+        }
+        .list-item.selected {
+            background: rgba(139, 92, 246, 0.15);
+            border-color: var(--primary);
+        }
+        .item-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .item-addr {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.3;
+        }
+
+        /* Custom Infowindow */
+        .custom-overlay {
+            background: rgba(15, 12, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--primary);
+            border-radius: 12px;
+            padding: 0.85rem 1.2rem;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.5);
+            color: white;
+            font-family: var(--font-main);
+            min-width: 220px;
+            position: relative;
+        }
+        body.light-theme .custom-overlay {
+            background: rgba(255, 255, 255, 0.95);
+            border-color: var(--primary);
+            color: #0f172a;
+        }
+        .custom-overlay::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 8px 8px 0;
+            border-style: solid;
+            border-color: rgba(15, 12, 30, 0.95) transparent;
+            display: block;
+            width: 0;
+        }
+        body.light-theme .custom-overlay::after {
+            border-color: rgba(255, 255, 255, 0.95) transparent;
+        }
+
+        /* Theme Toggle Button */
+        .theme-toggle {
+            position: absolute;
+            top: 1.5rem;
+            right: 1.5rem;
+            z-index: 100;
+            background: rgba(10, 8, 22, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--card-border);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        body.light-theme .theme-toggle {
+            background: rgba(255, 255, 255, 0.8);
+            color: #0f172a;
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" onclick="toggleTheme()">☀️ 테마 변경</button>
+
+    <!-- Sidebar Control Panel -->
+    <div class="sidebar">
+        <div>
+            <h2>🗺️ 엑셀 주소 지도기</h2>
+            <p class="desc">이름과 주소가 입력된 엑셀 파일을 업로드하여 지도에 즉시 표시합니다.</p>
+        </div>
+
+        <!-- Kakao Key Config Card -->
+        <div class="glass-card">
+            <h2>🔑 카카오 지도 설정</h2>
+            <div class="form-group">
+                <label for="kakao-app-key">Kakao JavaScript App Key</label>
+                <input type="password" id="kakao-app-key" class="form-control" placeholder="발급받은 JavaScript 키 입력">
+            </div>
+            <button class="btn btn-accent" style="width: 100%; margin-top: 0.75rem;" onclick="saveKakaoKey()">💾 API 키 저장</button>
+        </div>
+
+        <!-- Upload Card -->
+        <div class="glass-card">
+            <h2>📥 엑셀 파일 업로드</h2>
+            <p class="desc">첫 행에 '이름'과 '주소' 열이 포함된 엑셀 파일을 선택하거나 끌어다 놓으세요.</p>
+            <div style="margin-top: 1rem;">
+                <div id="drop-zone" class="upload-area" onclick="triggerFileInput()">
+                    <span style="font-size: 2rem;">📊</span>
+                    <span style="font-size: 0.8rem; font-weight:700; color: var(--text-secondary);">이곳에 엑셀파일 드롭 또는 클릭</span>
+                </div>
+                <input type="file" id="excel-file-input" accept=".xlsx, .xls" style="display: none;" onchange="handleFileSelect(event)">
+            </div>
+
+            <!-- Progress Bar UI -->
+            <div id="progress-container" class="progress-container">
+                <div style="display: flex; justify-content: space-between; font-size: 0.75rem; font-weight:700;">
+                    <span id="progress-status" style="color:var(--text-secondary);">주소 좌표 변환 중...</span>
+                    <span id="progress-percent" style="color:var(--accent);">0%</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progress-bar-fill" class="progress-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address List Card -->
+        <div class="list-container">
+            <div class="list-header">
+                <h2>👥 파싱된 주소 목록</h2>
+                <span id="total-count" style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">0명</span>
+            </div>
+            <div class="search-wrapper">
+                <input type="text" id="search-input" class="form-control" placeholder="🔍 이름 또는 주소 검색" oninput="filterList()">
+            </div>
+            <div id="list-items" class="list-items">
+                <!-- Items populated by JavaScript -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Map Area -->
+    <div id="map" class="map-container"></div>
+
+    <script>
+        let map = null;
+        let geocoder = null;
+        let markers = [];
+        let parsedData = []; // Array of { name, address, lat, lng }
+        let selectedIndex = null;
+        let activeOverlay = null;
+
+        // Theme Toggle
+        function toggleTheme() {
+            document.body.classList.toggle('light-theme');
+            const isLight = document.body.classList.contains('light-theme');
+            localStorage.setItem('map_theme', isLight ? 'light' : 'dark');
+        }
+
+        // Load cached Kakao Key and theme
+        window.addEventListener('DOMContentLoaded', () => {
+            const cachedTheme = localStorage.getItem('map_theme');
+            if (cachedTheme === 'light') {
+                document.body.classList.add('light-theme');
+            }
+
+            const cachedKey = localStorage.getItem('kakao_app_key');
+            if (cachedKey) {
+                document.getElementById('kakao-app-key').value = cachedKey;
+                loadKakaoMapSDK(cachedKey);
+            } else {
+                alert('지도를 구동하기 위해 카카오 지도 Javascript API 키를 입력해 주세요!');
+            }
+
+            // Drag and Drop Event Listeners
+            const dropZone = document.getElementById('drop-zone');
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    processFile(e.dataTransfer.files[0]);
+                }
+            });
+        });
+
+        function saveKakaoKey() {
+            const key = document.getElementById('kakao-app-key').value.trim();
+            if (!key) {
+                alert('API 키를 입력해 주세요.');
+                return;
+            }
+            localStorage.setItem('kakao_app_key', key);
+            alert('카카오 API 키가 저장되었습니다. 지도를 로딩합니다.');
+            location.reload();
+        }
+
+        // Dynamically load Kakao Map SDK
+        function loadKakaoMapSDK(key) {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&libraries=services&autoload=false`;
+            script.onload = () => {
+                kakao.maps.load(() => {
+                    initMap();
+                });
+            };
+            script.onerror = () => {
+                alert('카카오 지도 SDK 로드 실패. API 키를 확인해 주세요.');
+            };
+            document.head.appendChild(script);
+        }
+
+        function initMap() {
+            const container = document.getElementById('map');
+            const options = {
+                center: new kakao.maps.LatLng(37.566826, 126.9786567), // Seoul Default
+                level: 3
+            };
+            map = new kakao.maps.Map(container, options);
+            geocoder = new kakao.maps.services.Geocoder();
+
+            // Zoom controls
+            const zoomControl = new kakao.maps.ZoomControl();
+            map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+        }
+
+        function triggerFileInput() {
+            document.getElementById('excel-file-input').click();
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                processFile(e.target.files[0]);
+            }
+        }
+
+        function processFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+
+                    if (json.length === 0) {
+                        alert('엑셀 파일에 데이터가 없습니다.');
+                        return;
+                    }
+
+                    // Scan headers
+                    const firstRow = json[0];
+                    let nameKey = '';
+                    let addrKey = '';
+
+                    for (let key in firstRow) {
+                        const lowKey = key.toLowerCase();
+                        if (lowKey.includes('이름') || lowKey.includes('name') || lowKey.includes('성명')) {
+                            nameKey = key;
+                        }
+                        if (lowKey.includes('주소') || lowKey.includes('address') || lowKey.includes('addr') || lowKey.includes('거주지')) {
+                            addrKey = key;
+                        }
+                    }
+
+                    // Fallback to columns 0 and 1 if keys not matched
+                    if (!nameKey || !addrKey) {
+                        const keys = Object.keys(firstRow);
+                        nameKey = nameKey || keys[0];
+                        addrKey = addrKey || keys[1];
+                    }
+
+                    // Format data
+                    parsedData = json.map(row => ({
+                        name: row[nameKey] ? String(row[nameKey]).trim() : '이름 없음',
+                        address: row[addrKey] ? String(row[addrKey]).trim() : ''
+                    })).filter(item => item.address.length > 0);
+
+                    if (parsedData.length === 0) {
+                        alert('유효한 주소 데이터가 없습니다. 열 이름(이름, 주소)을 확인해 주세요.');
+                        return;
+                    }
+
+                    alert(`성공적으로 ${parsedData.length}명의 데이터를 읽어왔습니다. 주소 좌표 변환을 시작합니다.`);
+                    geocodeAllAddresses();
+
+                } catch (err) {
+                    alert('엑셀 파일을 읽는 데 실패했습니다: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Sequence Geocoding to avoid API lock
+        async function geocodeAllAddresses() {
+            if (!geocoder) {
+                alert('지도 서비스가 아직 준비되지 않았습니다. 잠시만 기다려 주세요.');
+                return;
+            }
+
+            // Reset current map view
+            clearAllMarkers();
+            
+            const progressContainer = document.getElementById('progress-container');
+            const progressFill = document.getElementById('progress-bar-fill');
+            const progressPercent = document.getElementById('progress-percent');
+            const progressStatus = document.getElementById('progress-status');
+
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressPercent.textContent = '0%';
+
+            const bounds = new kakao.maps.LatLngBounds();
+            let successCount = 0;
+
+            for (let i = 0; i < parsedData.length; i++) {
+                const item = parsedData[i];
+                progressStatus.textContent = `${i + 1} / ${parsedData.length} 변환 중...`;
+                
+                try {
+                    const coords = await geocodeAddressPromise(item.address);
+                    item.lat = coords.lat;
+                    item.lng = coords.lng;
+                    
+                    // Create pin
+                    const markerPosition = new kakao.maps.LatLng(item.lat, item.lng);
+                    const marker = new kakao.maps.Marker({
+                        position: markerPosition,
+                        map: map
+                    });
+                    
+                    markers.push(marker);
+                    bounds.extend(markerPosition);
+                    successCount++;
+
+                    // Click event on marker
+                    const index = i;
+                    kakao.maps.event.addListener(marker, 'click', () => {
+                        selectListItem(index, true);
+                    });
+
+                } catch (e) {
+                    console.warn(`Failed to geocode address: ${item.address}`, e);
+                    item.lat = null;
+                    item.lng = null;
+                }
+
+                // Update Progress UI
+                const pct = Math.round(((i + 1) / parsedData.length) * 100);
+                progressFill.style.width = `${pct}%`;
+                progressPercent.textContent = `${pct}%`;
+
+                // Brief sleep to avoid UI freezing
+                await new Promise(r => setTimeout(r, 60));
+            }
+
+            progressStatus.textContent = '좌표 변환 완료!';
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 2000);
+
+            // Center map on all markers
+            if (successCount > 0) {
+                map.setBounds(bounds);
+            }
+
+            // Populate Sidebar List
+            renderSidebarList();
+        }
+
+        function geocodeAddressPromise(address) {
+            return new Promise((resolve, reject) => {
+                // Clear optional details (apt building/ho) in parentheses to increase match rate
+                const cleanAddr = address.split('(')[0].trim();
+                geocoder.addressSearch(cleanAddr, (result, status) => {
+                    if (status === kakao.maps.services.Status.OK) {
+                        resolve({
+                            lat: parseFloat(result[0].y),
+                            lng: parseFloat(result[0].x)
+                        });
+                    } else {
+                        reject(status);
+                    }
+                });
+            });
+        }
+
+        function clearAllMarkers() {
+            markers.forEach(m => m.setMap(null));
+            markers = [];
+            if (activeOverlay) {
+                activeOverlay.setMap(null);
+                activeOverlay = null;
+            }
+        }
+
+        function renderSidebarList() {
+            const list = document.getElementById('list-items');
+            list.innerHTML = '';
+            document.getElementById('total-count').textContent = `${parsedData.length}명`;
+
+            parsedData.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.id = `item-${idx}`;
+                div.onclick = () => selectListItem(idx, true);
+
+                const statusColor = item.lat ? '' : `style="color: var(--danger);"`;
+
+                div.innerHTML = `
+                    <div class="item-name" ${statusColor}>${item.name} ${item.lat ? '📍' : '❌ 주소오류'}</div>
+                    <div class="item-addr">${item.address}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function selectListItem(idx, panTo = false) {
+            // Remove previous selected class
+            if (selectedIndex !== null) {
+                const prev = document.getElementById(`item-${selectedIndex}`);
+                if (prev) prev.classList.remove('selected');
+            }
+
+            selectedIndex = idx;
+            const currentItem = document.getElementById(`item-${idx}`);
+            if (currentItem) {
+                currentItem.classList.add('selected');
+                currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            const item = parsedData[idx];
+            if (!item.lat) return;
+
+            // Close active overlay
+            if (activeOverlay) {
+                activeOverlay.setMap(null);
+            }
+
+            // Create custom overlay
+            const content = `
+                <div class="custom-overlay">
+                    <div style="font-weight:800; font-size:1rem; margin-bottom:0.25rem; display:flex; align-items:center; gap:0.4rem;">👤 ${item.name}</div>
+                    <div style="font-size:0.75rem; opacity:0.8; line-height:1.4;">🏠 ${item.address}</div>
+                </div>
+            `;
+
+            const position = new kakao.maps.LatLng(item.lat, item.lng);
+            activeOverlay = new kakao.maps.CustomOverlay({
+                content: content,
+                position: position,
+                yAnchor: 1.35
+            });
+
+            activeOverlay.setMap(map);
+
+            if (panTo) {
+                map.panTo(position);
+            }
+        }
+
+        function filterList() {
+            const query = document.getElementById('search-input').value.toLowerCase().trim();
+            const items = document.querySelectorAll('.list-item');
+            
+            parsedData.forEach((item, idx) => {
+                const element = document.getElementById(`item-${idx}`);
+                if (!element) return;
+
+                const nameMatch = item.name.toLowerCase().includes(query);
+                const addrMatch = item.address.toLowerCase().includes(query);
+
+                if (nameMatch || addrMatch) {
+                    element.style.display = 'flex';
+                } else {
+                    element.style.display = 'none';
+                }
+            });
+        }
+    </script>
+</body>
+</html>
