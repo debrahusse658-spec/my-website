@@ -407,6 +407,26 @@
         let activeOverlay = null;
         let nameLabels = [];
 
+        function parseDongHo(address) {
+            let dong = 0;
+            let ho = 0;
+            const matchParen = address.match(/\(([^)]+)\)/);
+            if (matchParen) {
+                const inside = matchParen[1];
+                const slashMatch = inside.match(/(\d+)\s*\/\s*(\d+)/);
+                if (slashMatch) {
+                    dong = parseInt(slashMatch[1], 10);
+                    ho = parseInt(slashMatch[2], 10);
+                    return { dong, ho };
+                }
+                const dongMatch = inside.match(/(\d+)\s*동/);
+                const hoMatch = inside.match(/(\d+)\s*호/);
+                if (dongMatch) dong = parseInt(dongMatch[1], 10);
+                if (hoMatch) ho = parseInt(hoMatch[1], 10);
+            }
+            return { dong, ho };
+        }
+
         // Theme Toggle
         function toggleTheme() {
             document.body.classList.toggle('light-theme');
@@ -590,14 +610,27 @@
                     let finalLat = coords.lat;
                     let finalLng = coords.lng;
                     
+                    const { dong, ho } = parseDongHo(item.address);
+                    if (dong > 0) {
+                        const angle = (dong * 137.5) * (Math.PI / 180);
+                        const radius = 0.00025; // Spreads buildings out
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    }
+                    if (ho > 0) {
+                        const angle = (ho * 137.5) * (Math.PI / 180);
+                        const radius = 0.00005; // Spreads households within building
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    }
+                    
                     const coordKey = finalLat.toFixed(6) + ',' + finalLng.toFixed(6);
                     if (coordsRegistry[coordKey]) {
                         const count = coordsRegistry[coordKey];
                         coordsRegistry[coordKey] = count + 1;
                         
                         const angle = (count * 2 * Math.PI) / 8;
-                        const ring = Math.floor(count / 8) + 1;
-                        const radius = 0.00007 * ring; 
+                        const radius = 0.00002; // Tiny stack offset for exact same household
                         
                         finalLat = finalLat + (Math.cos(angle) * radius);
                         finalLng = finalLng + (Math.sin(angle) * radius);

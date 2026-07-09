@@ -6103,6 +6103,26 @@ ${m.notes || '등록된 메모가 없습니다.'}
         let mapNameLabels = [];
         let mapSDKLoaded = false;
 
+        function parseDongHo(address) {
+            let dong = 0;
+            let ho = 0;
+            const matchParen = address.match(/\(([^)]+)\)/);
+            if (matchParen) {
+                const inside = matchParen[1];
+                const slashMatch = inside.match(/(\d+)\s*\/\s*(\d+)/);
+                if (slashMatch) {
+                    dong = parseInt(slashMatch[1], 10);
+                    ho = parseInt(slashMatch[2], 10);
+                    return { dong, ho };
+                }
+                const dongMatch = inside.match(/(\d+)\s*동/);
+                const hoMatch = inside.match(/(\d+)\s*호/);
+                if (dongMatch) dong = parseInt(dongMatch[1], 10);
+                if (hoMatch) ho = parseInt(hoMatch[1], 10);
+            }
+            return { dong, ho };
+        }
+
         function loadMapSDKAndInit() {
             const key = safeStorage.getItem('ssm_kakao_key') || '';
             const warning = document.getElementById('map-api-key-warning');
@@ -6283,20 +6303,34 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     }
                 }
 
-                // Dynamic Jitter for display
+                // Dynamic Jitter for display based on Dong and Ho
                 let displayLat = lat;
                 let displayLng = lng;
-                const coordKey = lat.toFixed(6) + ',' + lng.toFixed(6);
+                
+                const { dong, ho } = parseDongHo(m.address);
+                if (dong > 0) {
+                    const angle = (dong * 137.5) * (Math.PI / 180);
+                    const radius = 0.00025; // Spreads buildings out across complex
+                    displayLat = displayLat + (Math.cos(angle) * radius);
+                    displayLng = displayLng + (Math.sin(angle) * radius);
+                }
+                if (ho > 0) {
+                    const angle = (ho * 137.5) * (Math.PI / 180);
+                    const radius = 0.00005; // Spreads households slightly within building
+                    displayLat = displayLat + (Math.cos(angle) * radius);
+                    displayLng = displayLng + (Math.sin(angle) * radius);
+                }
+
+                const coordKey = displayLat.toFixed(6) + ',' + displayLng.toFixed(6);
                 if (coordsRegistry[coordKey]) {
                     const count = coordsRegistry[coordKey];
                     coordsRegistry[coordKey] = count + 1;
                     
                     const angle = (count * 2 * Math.PI) / 8;
-                    const ring = Math.floor(count / 8) + 1;
-                    const radius = 0.00007 * ring; 
+                    const radius = 0.00002; // Tiny stack offset for exact same room
                     
-                    displayLat = lat + (Math.cos(angle) * radius);
-                    displayLng = lng + (Math.sin(angle) * radius);
+                    displayLat = displayLat + (Math.cos(angle) * radius);
+                    displayLng = displayLng + (Math.sin(angle) * radius);
                 } else {
                     coordsRegistry[coordKey] = 1;
                 }
@@ -6557,14 +6591,27 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     let finalLat = coords.lat;
                     let finalLng = coords.lng;
                     
+                    const { dong, ho } = parseDongHo(item.address);
+                    if (dong > 0) {
+                        const angle = (dong * 137.5) * (Math.PI / 180);
+                        const radius = 0.00025; // Spreads buildings out
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    }
+                    if (ho > 0) {
+                        const angle = (ho * 137.5) * (Math.PI / 180);
+                        const radius = 0.00005; // Spreads households within building
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    }
+                    
                     const coordKey = finalLat.toFixed(6) + ',' + finalLng.toFixed(6);
                     if (coordsRegistry[coordKey]) {
                         const count = coordsRegistry[coordKey];
                         coordsRegistry[coordKey] = count + 1;
                         
                         const angle = (count * 2 * Math.PI) / 8;
-                        const ring = Math.floor(count / 8) + 1;
-                        const radius = 0.00007 * ring; 
+                        const radius = 0.00002; // Tiny stack offset for exact same household
                         
                         finalLat = finalLat + (Math.cos(angle) * radius);
                         finalLng = finalLng + (Math.sin(angle) * radius);
