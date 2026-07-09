@@ -6099,8 +6099,9 @@ ${m.notes || '등록된 메모가 없습니다.'}
         let kakaoMap = null;
         let mapGeocoder = null;
         let mapMarkers = [];
-        let mapOverlays = [];
         let mapNameLabels = [];
+        let activeMapOverlay = null;
+        let mapSelectedIndex = null;
         let mapSDKLoaded = false;
 
         function parseDongHo(address) {
@@ -6177,13 +6178,20 @@ ${m.notes || '등록된 메모가 없습니다.'}
 
             // Close overlays when clicking empty space on the map
             kakao.maps.event.addListener(kakaoMap, 'click', () => {
-                mapOverlays.forEach(o => o.setMap(null));
-                mapActiveOverlayIndex = null;
-                const listItems = document.querySelectorAll('#map-member-list .list-item');
-                listItems.forEach(el => el.classList.remove('selected'));
+                if (activeMapOverlay) {
+                    activeMapOverlay.setMap(null);
+                    activeMapOverlay = null;
+                }
+                if (mapSelectedIndex !== null) {
+                    const prev = document.getElementById(`map-item-${mapSelectedIndex}`);
+                    if (prev) prev.classList.remove('selected');
+                    mapSelectedIndex = null;
+                }
                 
-                mapExcelOverlays.forEach(o => o.setMap(null));
-                mapExcelActiveOverlayIndex = null;
+                if (activeMapExcelOverlay) {
+                    activeMapExcelOverlay.setMap(null);
+                    activeMapExcelOverlay = null;
+                }
                 if (mapExcelSelectedIndex !== null) {
                     const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
                     if (prev) prev.classList.remove('selected');
@@ -6239,10 +6247,13 @@ ${m.notes || '등록된 메모가 없습니다.'}
         function clearMapMarkers() {
             mapMarkers.forEach(m => m.setMap(null));
             mapMarkers = [];
-            mapOverlays.forEach(o => o.setMap(null));
-            mapOverlays = [];
             mapNameLabels.forEach(l => l.setMap(null));
             mapNameLabels = [];
+            if (activeMapOverlay) {
+                activeMapOverlay.setMap(null);
+                activeMapOverlay = null;
+            }
+            mapSelectedIndex = null;
         }
 
         function geocodeAddressPromise(address) {
@@ -6360,6 +6371,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 });
 
                 m.markerIndex = successCount;
+                m.displayLat = displayLat;
+                m.displayLng = displayLng;
                 mapMarkers.push(marker);
                 bounds.extend(position);
                 successCount++;
@@ -6377,27 +6390,9 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 });
                 mapNameLabels.push(nameLabel);
 
-                const overlayContent = document.createElement('div');
-                overlayContent.className = 'custom-overlay';
-                overlayContent.innerHTML = `
-                    <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.25rem;">👤 ${m.name}</div>
-                    <div style="font-size:0.75rem; opacity:0.8; margin-bottom:0.4rem;">구역: ${m.parish || '미지정'} | 부서: ${m.department || '미지정'}</div>
-                    <div style="font-size:0.7rem; color:#a78bfa; margin-bottom:0.5rem; line-height:1.3;">🏠 ${m.address}</div>
-                    <button class="btn btn-primary" style="font-size:0.7rem; padding:0.25rem 0.5rem; width:100%; height:auto;" onclick="viewMemberDetailFromMap('${m.id}')">🔍 상세 교적 보기</button>
-                `;
-
-                const overlay = new kakao.maps.CustomOverlay({
-                    content: overlayContent,
-                    position: position,
-                    yAnchor: 1.35
-                });
-
-                mapOverlays.push(overlay);
-
                 const memberId = m.id;
-                const index = successCount - 1;
                 kakao.maps.event.addListener(marker, 'click', () => {
-                    focusOnMapMember(memberId, index);
+                    focusOnMapMember(memberId, false);
                 });
             }
 
@@ -6412,49 +6407,59 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
         }
 
-        let mapActiveOverlayIndex = null;
-        function showMapOverlay(idx, position, forceOpen = false) {
-            if (!forceOpen && mapActiveOverlayIndex === idx) {
-                mapOverlays.forEach(o => o.setMap(null));
-                mapActiveOverlayIndex = null;
-                const listItems = document.querySelectorAll('#map-member-list .list-item');
-                listItems.forEach(el => el.classList.remove('selected'));
-                return;
-            }
-
-            mapOverlays.forEach(o => o.setMap(null));
-            if (mapOverlays[idx]) {
-                mapOverlays[idx].setMap(kakaoMap);
-                mapActiveOverlayIndex = idx;
-            }
-            if (position) {
-                kakaoMap.panTo(position);
-            }
-        }
-
-        function focusOnMapMember(id, markerIdx = null) {
+        function focusOnMapMember(id, forceOpen = false) {
             const memberIdx = members.findIndex(m => m.id === id);
             if (memberIdx === -1) return;
             const m = members[memberIdx];
             if (isNaN(parseFloat(m.lat)) || isNaN(parseFloat(m.lng))) return;
 
-            const listItems = document.querySelectorAll('#map-member-list .list-item');
-            listItems.forEach(el => el.classList.remove('selected'));
-            const targetEl = document.getElementById(`map-item-${id}`);
-            if (targetEl) {
-                targetEl.classList.add('selected');
-                targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            // Toggle overlay off if clicked same item and not forced
+            if (!forceOpen && mapSelectedIndex === id) {
+                if (activeMapOverlay) {
+                    activeMapOverlay.setMap(null);
+                    activeMapOverlay = null;
+                }
+                const prev = document.getElementById(`map-item-${mapSelectedIndex}`);
+                if (prev) prev.classList.remove('selected');
+                mapSelectedIndex = null;
+                return;
             }
 
-            let finalMarkerIdx = markerIdx;
-            if (finalMarkerIdx === null || finalMarkerIdx === undefined) {
-                finalMarkerIdx = m.markerIndex;
+            if (mapSelectedIndex !== null) {
+                const prev = document.getElementById(`map-item-${mapSelectedIndex}`);
+                if (prev) prev.classList.remove('selected');
             }
 
-            if (finalMarkerIdx !== undefined && finalMarkerIdx !== null && mapMarkers[finalMarkerIdx]) {
-                const pos = mapMarkers[finalMarkerIdx].getPosition();
-                showMapOverlay(finalMarkerIdx, pos, true);
+            mapSelectedIndex = id;
+            const currentItem = document.getElementById(`map-item-${id}`);
+            if (currentItem) {
+                currentItem.classList.add('selected');
+                currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
+
+            if (activeMapOverlay) {
+                activeMapOverlay.setMap(null);
+            }
+
+            const overlayContent = document.createElement('div');
+            overlayContent.className = 'custom-overlay';
+            overlayContent.innerHTML = `
+                <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.25rem;">👤 ${m.name}</div>
+                <div style="font-size:0.75rem; opacity:0.8; margin-bottom:0.4rem;">구역: ${m.parish || '미지정'} | 부서: ${m.department || '미지정'}</div>
+                <div style="font-size:0.7rem; color:#a78bfa; margin-bottom:0.5rem; line-height:1.3;">🏠 ${m.address}</div>
+                <button class="btn btn-primary" style="font-size:0.7rem; padding:0.25rem 0.5rem; width:100%; height:auto;" onclick="viewMemberDetailFromMap('${m.id}')">🔍 상세 교적 보기</button>
+            `;
+
+            const pos = new kakao.maps.LatLng(m.displayLat || m.lat, m.displayLng || m.lng);
+            activeMapOverlay = new kakao.maps.CustomOverlay({
+                content: overlayContent,
+                position: pos,
+                yAnchor: 1.35
+            });
+
+            activeMapOverlay.setMap(kakaoMap);
+
+            kakaoMap.panTo(pos);
         }
 
         function filterMapMarkers() {
@@ -6488,8 +6493,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
         let mapMode = 'db'; // 'db' or 'excel'
         let mapExcelData = []; // Array of { name, address, lat, lng }
         let mapExcelMarkers = [];
-        let mapExcelOverlays = [];
         let mapExcelNameLabels = [];
+        let activeMapExcelOverlay = null;
         let mapExcelSelectedIndex = null;
 
         function switchMapMode(mode) {
@@ -6528,10 +6533,13 @@ ${m.notes || '등록된 메모가 없습니다.'}
         function clearMapExcelMarkers() {
             mapExcelMarkers.forEach(m => m.setMap(null));
             mapExcelMarkers = [];
-            mapExcelOverlays.forEach(o => o.setMap(null));
-            mapExcelOverlays = [];
             mapExcelNameLabels.forEach(l => l.setMap(null));
             mapExcelNameLabels = [];
+            if (activeMapExcelOverlay) {
+                activeMapExcelOverlay.setMap(null);
+                activeMapExcelOverlay = null;
+            }
+            mapExcelSelectedIndex = null;
         }
 
         function triggerMapExcelInput() {
@@ -6654,6 +6662,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     
                     item.lat = finalLat;
                     item.lng = finalLng;
+                    item.displayLat = finalLat;
+                    item.displayLng = finalLng;
                     
                     const position = new kakao.maps.LatLng(item.lat, item.lng);
                     const marker = new kakao.maps.Marker({
@@ -6680,23 +6690,9 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     });
                     mapExcelNameLabels.push(nameLabel);
 
-                    const overlayContent = document.createElement('div');
-                    overlayContent.className = 'custom-overlay';
-                    overlayContent.innerHTML = `
-                        <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.25rem;">👤 ${item.name}</div>
-                        <div style="font-size:0.75rem; opacity:0.8; line-height:1.4;">🏠 ${item.address}</div>
-                    `;
-
-                    const overlay = new kakao.maps.CustomOverlay({
-                        content: overlayContent,
-                        position: position,
-                        yAnchor: 1.35
-                    });
-                    mapExcelOverlays.push(overlay);
-
                     const index = i;
                     kakao.maps.event.addListener(marker, 'click', () => {
-                        selectMapExcelItem(index, true);
+                        selectMapExcelItem(index, false);
                     });
 
                 } catch (e) {
@@ -6748,16 +6744,16 @@ ${m.notes || '등록된 메모가 없습니다.'}
             });
         }
 
-        let mapExcelActiveOverlayIndex = null;
         function selectMapExcelItem(idx, panTo = false, forceOpen = false) {
-            if (!forceOpen && mapExcelActiveOverlayIndex === idx) {
-                mapExcelOverlays.forEach(o => o.setMap(null));
-                mapExcelActiveOverlayIndex = null;
-                if (mapExcelSelectedIndex !== null) {
-                    const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
-                    if (prev) prev.classList.remove('selected');
-                    mapExcelSelectedIndex = null;
+            // Toggle overlay off if clicked same item and not forced
+            if (!forceOpen && mapExcelSelectedIndex === idx) {
+                if (activeMapExcelOverlay) {
+                    activeMapExcelOverlay.setMap(null);
+                    activeMapExcelOverlay = null;
                 }
+                const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
+                if (prev) prev.classList.remove('selected');
+                mapExcelSelectedIndex = null;
                 return;
             }
 
@@ -6767,7 +6763,6 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
 
             mapExcelSelectedIndex = idx;
-            mapExcelActiveOverlayIndex = idx;
             const currentItem = document.getElementById(`map-excel-item-${idx}`);
             if (currentItem) {
                 currentItem.classList.add('selected');
@@ -6777,13 +6772,28 @@ ${m.notes || '등록된 메모가 없습니다.'}
             const item = mapExcelData[idx];
             if (!item.lat) return;
 
-            mapExcelOverlays.forEach(o => o.setMap(null));
-            if (item.markerIndex !== undefined && mapExcelOverlays[item.markerIndex]) {
-                mapExcelOverlays[item.markerIndex].setMap(kakaoMap);
+            if (activeMapExcelOverlay) {
+                activeMapExcelOverlay.setMap(null);
             }
 
+            const overlayContent = document.createElement('div');
+            overlayContent.className = 'custom-overlay';
+            overlayContent.innerHTML = `
+                <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.25rem;">👤 ${item.name}</div>
+                <div style="font-size:0.75rem; opacity:0.8; line-height:1.4;">🏠 ${item.address}</div>
+            `;
+
+            const pos = new kakao.maps.LatLng(item.displayLat || item.lat, item.displayLng || item.lng);
+            activeMapExcelOverlay = new kakao.maps.CustomOverlay({
+                content: overlayContent,
+                position: pos,
+                yAnchor: 1.35
+            });
+
+            activeMapExcelOverlay.setMap(kakaoMap);
+
             if (panTo) {
-                kakaoMap.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+                kakaoMap.panTo(pos);
             }
         }
 
