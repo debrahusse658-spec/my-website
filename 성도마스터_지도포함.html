@@ -6152,6 +6152,10 @@ ${m.notes || '등록된 메모가 없습니다.'}
                         m.lng = lng;
                         databaseUpdated = true;
                     } catch(err) {
+                        const nameEl = div.querySelector('div');
+                        if (nameEl) {
+                            nameEl.innerHTML = `<span style="color: var(--danger);">${m.name} ❌ 주소오류 (${err || '알수없음'})</span> <span style="font-size:0.7rem; padding:0.1rem 0.3rem; background:rgba(255,255,255,0.05); border-radius:4px; margin-left:0.25rem;">${m.parish || '미지정'}</span>`;
+                        }
                         continue;
                     }
                 }

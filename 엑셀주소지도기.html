@@ -628,6 +628,7 @@
                     console.warn(`Failed to geocode address: ${item.address}`, e);
                     item.lat = null;
                     item.lng = null;
+                    item.errorStatus = e;
                 }
 
                 // Update Progress UI
@@ -691,9 +692,10 @@
                 div.onclick = () => selectListItem(idx, true);
 
                 const statusColor = item.lat ? '' : `style="color: var(--danger);"`;
+                const suffix = item.lat ? '📍' : `❌ 주소오류 (${item.errorStatus || '알수없음'})`;
 
                 div.innerHTML = `
-                    <div class="item-name" ${statusColor}>${item.name} ${item.lat ? '📍' : '❌ 주소오류'}</div>
+                    <div class="item-name" ${statusColor}>${item.name} ${suffix}</div>
                     <div class="item-addr">${item.address}</div>
                 `;
                 list.appendChild(div);
