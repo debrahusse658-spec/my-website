@@ -6175,6 +6175,22 @@ ${m.notes || '등록된 메모가 없습니다.'}
             populateMapParishFilter();
             renderMembersOnMap();
 
+            // Close overlays when clicking empty space on the map
+            kakao.maps.event.addListener(kakaoMap, 'click', () => {
+                mapOverlays.forEach(o => o.setMap(null));
+                mapActiveOverlayIndex = null;
+                const listItems = document.querySelectorAll('#map-member-list .list-item');
+                listItems.forEach(el => el.classList.remove('selected'));
+                
+                mapExcelOverlays.forEach(o => o.setMap(null));
+                mapExcelActiveOverlayIndex = null;
+                if (mapExcelSelectedIndex !== null) {
+                    const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
+                    if (prev) prev.classList.remove('selected');
+                    mapExcelSelectedIndex = null;
+                }
+            });
+
             // Initialize Drag & Drop listeners for map Excel drop zone
             const dropZone = document.getElementById('map-drop-zone');
             if (dropZone) {
@@ -6395,10 +6411,20 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
         }
 
-        function showMapOverlay(idx, position) {
+        let mapActiveOverlayIndex = null;
+        function showMapOverlay(idx, position, forceOpen = false) {
+            if (!forceOpen && mapActiveOverlayIndex === idx) {
+                mapOverlays.forEach(o => o.setMap(null));
+                mapActiveOverlayIndex = null;
+                const listItems = document.querySelectorAll('#map-member-list .list-item');
+                listItems.forEach(el => el.classList.remove('selected'));
+                return;
+            }
+
             mapOverlays.forEach(o => o.setMap(null));
             if (mapOverlays[idx]) {
                 mapOverlays[idx].setMap(kakaoMap);
+                mapActiveOverlayIndex = idx;
             }
             if (position) {
                 kakaoMap.panTo(position);
@@ -6420,7 +6446,7 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
 
             if (m.markerIndex !== undefined && m.markerIndex !== null) {
-                showMapOverlay(m.markerIndex, new kakao.maps.LatLng(m.lat, m.lng));
+                showMapOverlay(m.markerIndex, new kakao.maps.LatLng(m.lat, m.lng), true);
             }
         }
 
@@ -6702,7 +6728,7 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 div.id = `map-excel-item-${idx}`;
                 div.style.padding = '0.5rem 0.75rem';
                 div.style.borderRadius = '8px';
-                div.onclick = () => selectMapExcelItem(idx, true);
+                div.onclick = () => selectMapExcelItem(idx, true, true);
 
                 const statusColor = item.lat ? '' : `style="color: var(--danger);"`;
                 const suffix = item.lat ? '📍' : `❌ 주소오류 (${item.errorStatus || '알수없음'})`;
@@ -6715,13 +6741,26 @@ ${m.notes || '등록된 메모가 없습니다.'}
             });
         }
 
-        function selectMapExcelItem(idx, panTo = false) {
+        let mapExcelActiveOverlayIndex = null;
+        function selectMapExcelItem(idx, panTo = false, forceOpen = false) {
+            if (!forceOpen && mapExcelActiveOverlayIndex === idx) {
+                mapExcelOverlays.forEach(o => o.setMap(null));
+                mapExcelActiveOverlayIndex = null;
+                if (mapExcelSelectedIndex !== null) {
+                    const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
+                    if (prev) prev.classList.remove('selected');
+                    mapExcelSelectedIndex = null;
+                }
+                return;
+            }
+
             if (mapExcelSelectedIndex !== null) {
                 const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
                 if (prev) prev.classList.remove('selected');
             }
 
             mapExcelSelectedIndex = idx;
+            mapExcelActiveOverlayIndex = idx;
             const currentItem = document.getElementById(`map-excel-item-${idx}`);
             if (currentItem) {
                 currentItem.classList.add('selected');

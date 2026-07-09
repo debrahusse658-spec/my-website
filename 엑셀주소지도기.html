@@ -506,6 +506,19 @@
             // Zoom controls
             const zoomControl = new kakao.maps.ZoomControl();
             map.addControl(zoomControl, kakao.maps.ControlPosition.RIGHT);
+
+            // Close overlay on clicking empty space on the map
+            kakao.maps.event.addListener(map, 'click', () => {
+                if (activeOverlay) {
+                    activeOverlay.setMap(null);
+                    activeOverlay = null;
+                }
+                if (selectedIndex !== null) {
+                    const prev = document.getElementById(`item-${selectedIndex}`);
+                    if (prev) prev.classList.remove('selected');
+                    selectedIndex = null;
+                }
+            });
         }
 
         function triggerFileInput() {
@@ -738,7 +751,7 @@
                 const div = document.createElement('div');
                 div.className = 'list-item';
                 div.id = `item-${idx}`;
-                div.onclick = () => selectListItem(idx, true);
+                div.onclick = () => selectListItem(idx, true, true);
 
                 const statusColor = item.lat ? '' : `style="color: var(--danger);"`;
                 const suffix = item.lat ? '📍' : `❌ 주소오류 (${item.errorStatus || '알수없음'})`;
@@ -751,7 +764,19 @@
             });
         }
 
-        function selectListItem(idx, panTo = false) {
+        function selectListItem(idx, panTo = false, forceOpen = false) {
+            // Toggle overlay off if clicked same item and not forced
+            if (!forceOpen && selectedIndex === idx) {
+                if (activeOverlay) {
+                    activeOverlay.setMap(null);
+                    activeOverlay = null;
+                }
+                const prev = document.getElementById(`item-${selectedIndex}`);
+                if (prev) prev.classList.remove('selected');
+                selectedIndex = null;
+                return;
+            }
+
             // Remove previous selected class
             if (selectedIndex !== null) {
                 const prev = document.getElementById(`item-${selectedIndex}`);
