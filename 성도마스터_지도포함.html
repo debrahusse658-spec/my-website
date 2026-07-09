@@ -1603,16 +1603,10 @@
         <!-- 🗺️ VIEW: MEMBER MAP -->
         <!-- ========================================== -->
         <section id="view-map" class="view-panel hidden" style="height:100%; display:flex; flex-direction:column; gap:1.25rem; overflow:hidden;">
-            <header style="display:flex; justify-content:space-between; align-items:center;">
+            <header>
                 <div>
-                    <h1 class="page-title">🗺️ 교적 지도 시각화</h1>
-                    <p class="page-desc">등록된 성도들의 거주지 주소를 지도 상에 구역별로 매핑하여 보여줍니다.</p>
-                </div>
-                <div style="display:flex; gap:0.75rem; align-items:center;">
-                    <select id="map-filter-parish" class="form-control" style="width:auto; height:38px;" onchange="renderMembersOnMap()">
-                        <option value="">전체 구역</option>
-                    </select>
-                    <input type="text" id="map-search-input" class="form-control" style="width:200px; height:38px;" placeholder="🔍 성도 이름 검색" oninput="filterMapMarkers()">
+                    <h1 class="page-title">🗺️ 지도 시각화 대시보드</h1>
+                    <p class="page-desc">성도 교적 주소 매핑 및 외부 주소 엑셀 업로드 시각화를 모두 지원합니다.</p>
                 </div>
             </header>
 
@@ -1627,15 +1621,71 @@
 
             <!-- Map View Split Screen -->
             <div id="map-view-wrapper" style="display:flex; gap:1.25rem; flex:1; overflow:hidden; position:relative;">
-                <!-- Left Sidebar List of mapped members -->
-                <div class="glass-card" style="width:280px; display:flex; flex-direction:column; gap:1rem; overflow:hidden; height:100%;">
-                    <h3 style="font-size:0.95rem; color:white; border-bottom:1px solid var(--card-border); padding-bottom:0.5rem; display:flex; justify-content:space-between;">
-                        <span>📍 매핑된 성도</span>
-                        <span id="map-mapped-count" style="color:var(--primary);">0명</span>
-                    </h3>
-                    <div id="map-member-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; padding-right:0.25rem;">
-                        <!-- Populate dynamic items -->
+                <!-- Left Sidebar Control Panel -->
+                <div class="glass-card" style="width:300px; display:flex; flex-direction:column; gap:0.75rem; overflow:hidden; height:100%;">
+                    
+                    <!-- Mode Switcher Group -->
+                    <div style="display:flex; background:rgba(255,255,255,0.05); padding:0.2rem; border-radius:8px; margin-bottom:0.25rem;">
+                        <button class="btn" id="map-btn-db" style="flex:1; font-size:0.75rem; padding:0.4rem; border-radius:6px; background:var(--primary); color:white; border:none; cursor:pointer;" onclick="switchMapMode('db')">👥 교적 성도</button>
+                        <button class="btn" id="map-btn-excel" style="flex:1; font-size:0.75rem; padding:0.4rem; border-radius:6px; background:transparent; color:var(--text-secondary); border:none; cursor:pointer;" onclick="switchMapMode('excel')">📊 외부 엑셀</button>
                     </div>
+
+                    <!-- Panel A: Database Members -->
+                    <div id="map-panel-db" style="display:flex; flex-direction:column; gap:0.75rem; flex:1; overflow:hidden;">
+                        <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                            <label style="font-size:0.7rem; font-weight:700; color:var(--text-secondary);">구역 필터</label>
+                            <select id="map-filter-parish" class="form-control" style="height:36px;" onchange="renderMembersOnMap()">
+                                <option value="">전체 구역</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                            <label style="font-size:0.7rem; font-weight:700; color:var(--text-secondary);">성도 검색</label>
+                            <input type="text" id="map-search-input" class="form-control" style="height:36px;" placeholder="🔍 성도 이름 검색" oninput="filterMapMarkers()">
+                        </div>
+                        <h3 style="font-size:0.85rem; color:white; border-bottom:1px solid var(--card-border); padding-bottom:0.4rem; display:flex; justify-content:space-between; margin-top:0.25rem;">
+                            <span>📍 매핑된 성도</span>
+                            <span id="map-mapped-count" style="color:var(--primary);">0명</span>
+                        </h3>
+                        <div id="map-member-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; padding-right:0.25rem;">
+                            <!-- Populate dynamic database items -->
+                        </div>
+                    </div>
+
+                    <!-- Panel B: External Excel -->
+                    <div id="map-panel-excel" style="display:none; flex-direction:column; gap:0.75rem; flex:1; overflow:hidden;">
+                        <!-- Drag & Drop Upload Zone -->
+                        <div id="map-drop-zone" class="upload-area" onclick="triggerMapExcelInput()" style="border: 2px dashed var(--card-border); border-radius: 12px; padding: 1.25rem 0.75rem; text-align: center; cursor: pointer; background: rgba(255, 255, 255, 0.01); display: flex; flex-direction: column; align-items: center; gap: 0.4rem; transition: var(--transition);">
+                            <span style="font-size: 1.5rem;">📥</span>
+                            <span style="font-size: 0.75rem; font-weight:700; color: var(--text-secondary);">엑셀파일 드롭 또는 클릭</span>
+                        </div>
+                        <input type="file" id="map-excel-file-input" accept=".xlsx, .xls" style="display: none;" onchange="handleMapExcelSelect(event)">
+
+                        <!-- Excel Progress Bar -->
+                        <div id="map-excel-progress-container" style="display: none;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.7rem; font-weight:700;">
+                                <span id="map-excel-progress-status" style="color:var(--text-secondary);">좌표 변환 중...</span>
+                                <span id="map-excel-progress-percent" style="color:var(--accent);">0%</span>
+                            </div>
+                            <div class="progress-bar-bg" style="width:100%; height:6px; background:rgba(255,255,255,0.05); border-radius:3px; overflow:hidden; margin-top:0.25rem;">
+                                <div id="map-excel-progress-bar-fill" class="progress-bar-fill" style="height:100%; width:0%; background:linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); border-radius:3px;"></div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex; flex-direction:column; gap:0.4rem;">
+                            <label style="font-size:0.7rem; font-weight:700; color:var(--text-secondary);">주소 검색</label>
+                            <input type="text" id="map-excel-search-input" class="form-control" style="height:36px;" placeholder="🔍 이름 또는 주소 검색" oninput="filterMapExcelMarkers()">
+                        </div>
+
+                        <h3 style="font-size:0.85rem; color:white; border-bottom:1px solid var(--card-border); padding-bottom:0.4rem; display:flex; justify-content:space-between; margin-top:0.25rem;">
+                            <span>📍 엑셀 주소 목록</span>
+                            <span id="map-excel-mapped-count" style="color:var(--accent);">0명</span>
+                        </h3>
+                        
+                        <div id="map-excel-member-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem; padding-right:0.25rem;">
+                            <!-- Populate dynamic excel items -->
+                        </div>
+                    </div>
+
                 </div>
                 <!-- Main Map container -->
                 <div id="ssm-kakao-map" style="flex:1; border-radius:16px; border:1px solid var(--card-border); height:100%; overflow:hidden; background:#110e24;"></div>
@@ -6103,6 +6153,28 @@ ${m.notes || '등록된 메모가 없습니다.'}
 
             populateMapParishFilter();
             renderMembersOnMap();
+
+            // Initialize Drag & Drop listeners for map Excel drop zone
+            const dropZone = document.getElementById('map-drop-zone');
+            if (dropZone) {
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'var(--primary)';
+                    dropZone.style.background = 'rgba(139, 92, 246, 0.05)';
+                });
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.style.borderColor = 'var(--card-border)';
+                    dropZone.style.background = 'rgba(255, 255, 255, 0.01)';
+                });
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'var(--card-border)';
+                    dropZone.style.background = 'rgba(255, 255, 255, 0.01)';
+                    if (e.dataTransfer.files.length > 0) {
+                        processMapExcelFile(e.dataTransfer.files[0]);
+                    }
+                });
+            }
         }
 
         function populateMapParishFilter() {
@@ -6332,6 +6404,278 @@ ${m.notes || '등록된 메모가 없습니다.'}
                     row.click();
                 }
             }, 100);
+        }
+
+        // ==========================================
+        // 🗺️ KAKAO MAP EXCEL MODE EXTRA ENGINE
+        // ==========================================
+        let mapMode = 'db'; // 'db' or 'excel'
+        let mapExcelData = []; // Array of { name, address, lat, lng }
+        let mapExcelMarkers = [];
+        let mapExcelOverlays = [];
+        let mapExcelSelectedIndex = null;
+
+        function switchMapMode(mode) {
+            mapMode = mode;
+            const btnDb = document.getElementById('map-btn-db');
+            const btnExcel = document.getElementById('map-btn-excel');
+            const panelDb = document.getElementById('map-panel-db');
+            const panelExcel = document.getElementById('map-panel-excel');
+
+            clearMapMarkers();
+            clearMapExcelMarkers();
+
+            if (mode === 'db') {
+                btnDb.style.background = 'var(--primary)';
+                btnDb.style.color = 'white';
+                btnExcel.style.background = 'transparent';
+                btnExcel.style.color = 'var(--text-secondary)';
+                
+                panelDb.style.display = 'flex';
+                panelExcel.style.display = 'none';
+
+                renderMembersOnMap();
+            } else {
+                btnExcel.style.background = 'var(--primary)';
+                btnExcel.style.color = 'white';
+                btnDb.style.background = 'transparent';
+                btnDb.style.color = 'var(--text-secondary)';
+                
+                panelExcel.style.display = 'flex';
+                panelDb.style.display = 'none';
+
+                renderMapExcelList();
+            }
+        }
+
+        function clearMapExcelMarkers() {
+            mapExcelMarkers.forEach(m => m.setMap(null));
+            mapExcelMarkers = [];
+            mapExcelOverlays.forEach(o => o.setMap(null));
+            mapExcelOverlays = [];
+        }
+
+        function triggerMapExcelInput() {
+            document.getElementById('map-excel-file-input').click();
+        }
+
+        function handleMapExcelSelect(e) {
+            if (e.target.files.length > 0) {
+                processMapExcelFile(e.target.files[0]);
+            }
+        }
+
+        function processMapExcelFile(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(sheet);
+
+                    if (json.length === 0) {
+                        alert('엑셀 파일에 데이터가 없습니다.');
+                        return;
+                    }
+
+                    const firstRow = json[0];
+                    let nameKey = '';
+                    let addrKey = '';
+
+                    for (let key in firstRow) {
+                        const lowKey = key.toLowerCase();
+                        if (lowKey.includes('이름') || lowKey.includes('name') || lowKey.includes('성명')) {
+                            nameKey = key;
+                        }
+                        if (lowKey.includes('주소') || lowKey.includes('address') || lowKey.includes('addr') || lowKey.includes('거주지')) {
+                            addrKey = key;
+                        }
+                    }
+
+                    if (!nameKey || !addrKey) {
+                        const keys = Object.keys(firstRow);
+                        nameKey = nameKey || keys[0];
+                        addrKey = addrKey || keys[1];
+                    }
+
+                    mapExcelData = json.map(row => ({
+                        name: row[nameKey] ? String(row[nameKey]).trim() : '이름 없음',
+                        address: row[addrKey] ? String(row[addrKey]).trim() : ''
+                    })).filter(item => item.address.length > 0);
+
+                    if (mapExcelData.length === 0) {
+                        alert('유효한 주소 데이터가 없습니다. 주소 열이 맞는지 확인해 주세요.');
+                        return;
+                    }
+
+                    geocodeMapExcelData();
+
+                } catch (err) {
+                    alert('엑셀 파일을 읽는 데 실패했습니다: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function geocodeMapExcelData() {
+            clearMapExcelMarkers();
+            
+            const progressContainer = document.getElementById('map-excel-progress-container');
+            const progressFill = document.getElementById('map-excel-progress-bar-fill');
+            const progressPercent = document.getElementById('map-excel-progress-percent');
+            const progressStatus = document.getElementById('map-excel-progress-status');
+
+            progressContainer.style.display = 'block';
+            progressFill.style.width = '0%';
+            progressPercent.textContent = '0%';
+
+            const bounds = new kakao.maps.LatLngBounds();
+            let successCount = 0;
+            const coordsRegistry = {};
+
+            for (let i = 0; i < mapExcelData.length; i++) {
+                const item = mapExcelData[i];
+                progressStatus.textContent = `${i + 1} / ${mapExcelData.length} 변환 중...`;
+                
+                try {
+                    const coords = await geocodeAddressPromise(item.address);
+                    let finalLat = coords.lat;
+                    let finalLng = coords.lng;
+                    
+                    const coordKey = finalLat.toFixed(6) + ',' + finalLng.toFixed(6);
+                    if (coordsRegistry[coordKey]) {
+                        const count = coordsRegistry[coordKey];
+                        coordsRegistry[coordKey] = count + 1;
+                        
+                        const angle = (count * 2 * Math.PI) / 8;
+                        const ring = Math.floor(count / 8) + 1;
+                        const radius = 0.00007 * ring; 
+                        
+                        finalLat = finalLat + (Math.cos(angle) * radius);
+                        finalLng = finalLng + (Math.sin(angle) * radius);
+                    } else {
+                        coordsRegistry[coordKey] = 1;
+                    }
+                    
+                    item.lat = finalLat;
+                    item.lng = finalLng;
+                    
+                    const position = new kakao.maps.LatLng(item.lat, item.lng);
+                    const marker = new kakao.maps.Marker({
+                        position: position,
+                        map: kakaoMap,
+                        title: item.name
+                    });
+                    
+                    mapExcelMarkers.push(marker);
+                    bounds.extend(position);
+                    successCount++;
+
+                    const overlayContent = document.createElement('div');
+                    overlayContent.className = 'custom-overlay';
+                    overlayContent.innerHTML = `
+                        <div style="font-weight:800; font-size:0.95rem; margin-bottom:0.25rem;">👤 ${item.name}</div>
+                        <div style="font-size:0.75rem; opacity:0.8; line-height:1.4;">🏠 ${item.address}</div>
+                    `;
+
+                    const overlay = new kakao.maps.CustomOverlay({
+                        content: overlayContent,
+                        position: position,
+                        yAnchor: 1.35
+                    });
+                    mapExcelOverlays.push(overlay);
+
+                    const index = i;
+                    kakao.maps.event.addListener(marker, 'click', () => {
+                        selectMapExcelItem(index, true);
+                    });
+
+                } catch (e) {
+                    item.lat = null;
+                    item.lng = null;
+                    item.errorStatus = e;
+                }
+
+                const pct = Math.round(((i + 1) / mapExcelData.length) * 100);
+                progressFill.style.width = `${pct}%`;
+                progressPercent.textContent = `${pct}%`;
+
+                await new Promise(r => setTimeout(r, 60));
+            }
+
+            progressStatus.textContent = '완료!';
+            setTimeout(() => {
+                progressContainer.style.display = 'none';
+            }, 2000);
+
+            if (successCount > 0) {
+                kakaoMap.setBounds(bounds);
+            }
+
+            renderMapExcelList();
+        }
+
+        function renderMapExcelList() {
+            const list = document.getElementById('map-excel-member-list');
+            list.innerHTML = '';
+            document.getElementById('map-excel-mapped-count').textContent = `${mapExcelData.length}명`;
+
+            mapExcelData.forEach((item, idx) => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.id = `map-excel-item-${idx}`;
+                div.style.padding = '0.5rem 0.75rem';
+                div.style.borderRadius = '8px';
+                div.onclick = () => selectMapExcelItem(idx, true);
+
+                const statusColor = item.lat ? '' : `style="color: var(--danger);"`;
+                const suffix = item.lat ? '📍' : `❌ 주소오류 (${item.errorStatus || '알수없음'})`;
+
+                div.innerHTML = `
+                    <div style="font-size:0.85rem; font-weight:700; color:white;" ${statusColor}>${item.name} ${suffix}</div>
+                    <div style="font-size:0.7rem; color:var(--text-secondary); text-overflow:ellipsis; white-space:nowrap; overflow:hidden;">${item.address}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function selectMapExcelItem(idx, panTo = false) {
+            if (mapExcelSelectedIndex !== null) {
+                const prev = document.getElementById(`map-excel-item-${mapExcelSelectedIndex}`);
+                if (prev) prev.classList.remove('selected');
+            }
+
+            mapExcelSelectedIndex = idx;
+            const currentItem = document.getElementById(`map-excel-item-${idx}`);
+            if (currentItem) {
+                currentItem.classList.add('selected');
+                currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+
+            const item = mapExcelData[idx];
+            if (!item.lat) return;
+
+            mapExcelOverlays.forEach(o => o.setMap(null));
+            if (mapExcelOverlays[idx]) {
+                mapExcelOverlays[idx].setMap(kakaoMap);
+            }
+
+            if (panTo) {
+                kakaoMap.panTo(new kakao.maps.LatLng(item.lat, item.lng));
+            }
+        }
+
+        function filterMapExcelMarkers() {
+            const query = document.getElementById('map-excel-search-input').value.toLowerCase().trim();
+            mapExcelData.forEach((item, idx) => {
+                const element = document.getElementById(`map-excel-item-${idx}`);
+                if (!element) return;
+                const match = item.name.toLowerCase().includes(query) || item.address.toLowerCase().includes(query);
+                element.style.display = match ? 'flex' : 'none';
+            });
         }
     </script>
 </body>
