@@ -6100,6 +6100,7 @@ ${m.notes || '등록된 메모가 없습니다.'}
         let mapGeocoder = null;
         let mapMarkers = [];
         let mapOverlays = [];
+        let mapNameLabels = [];
         let mapSDKLoaded = false;
 
         function loadMapSDKAndInit() {
@@ -6204,6 +6205,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
             mapMarkers = [];
             mapOverlays.forEach(o => o.setMap(null));
             mapOverlays = [];
+            mapNameLabels.forEach(l => l.setMap(null));
+            mapNameLabels = [];
         }
 
         function geocodeAddressPromise(address) {
@@ -6299,23 +6302,30 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 }
 
                 const position = new kakao.maps.LatLng(displayLat, displayLng);
-                const markerColor = getParishColor(m.parish);
-                const markerImage = new kakao.maps.MarkerImage(
-                    `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="${encodeURIComponent(markerColor)}" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="3" fill="white"/></svg>`,
-                    new kakao.maps.Size(24, 24),
-                    { offset: new kakao.maps.Point(12, 12) }
-                );
 
                 const marker = new kakao.maps.Marker({
                     position: position,
-                    image: markerImage,
                     map: kakaoMap,
                     title: m.name
                 });
 
+                m.markerIndex = successCount;
                 mapMarkers.push(marker);
                 bounds.extend(position);
                 successCount++;
+
+                // Create floating name label above pin
+                const labelDiv = document.createElement('div');
+                labelDiv.style.cssText = 'background: rgba(15, 23, 42, 0.85); color: #fff; padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.3);';
+                labelDiv.textContent = m.name;
+
+                const nameLabel = new kakao.maps.CustomOverlay({
+                    position: position,
+                    content: labelDiv,
+                    yAnchor: 2.6,
+                    map: kakaoMap
+                });
+                mapNameLabels.push(nameLabel);
 
                 const overlayContent = document.createElement('div');
                 overlayContent.className = 'custom-overlay';
@@ -6334,9 +6344,9 @@ ${m.notes || '등록된 메모가 없습니다.'}
 
                 mapOverlays.push(overlay);
 
-                const index = i;
+                const memberId = m.id;
                 kakao.maps.event.addListener(marker, 'click', () => {
-                    showMapOverlay(index, position);
+                    focusOnMapMember(memberId);
                 });
             }
 
@@ -6375,9 +6385,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            const markerIdx = mapMarkers.findIndex(marker => marker.getTitle() === m.name);
-            if (markerIdx !== -1) {
-                showMapOverlay(markerIdx, new kakao.maps.LatLng(m.lat, m.lng));
+            if (m.markerIndex !== undefined && m.markerIndex !== null) {
+                showMapOverlay(m.markerIndex, new kakao.maps.LatLng(m.lat, m.lng));
             }
         }
 
@@ -6413,6 +6422,7 @@ ${m.notes || '등록된 메모가 없습니다.'}
         let mapExcelData = []; // Array of { name, address, lat, lng }
         let mapExcelMarkers = [];
         let mapExcelOverlays = [];
+        let mapExcelNameLabels = [];
         let mapExcelSelectedIndex = null;
 
         function switchMapMode(mode) {
@@ -6453,6 +6463,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
             mapExcelMarkers = [];
             mapExcelOverlays.forEach(o => o.setMap(null));
             mapExcelOverlays = [];
+            mapExcelNameLabels.forEach(l => l.setMap(null));
+            mapExcelNameLabels = [];
         }
 
         function triggerMapExcelInput() {
@@ -6570,9 +6582,23 @@ ${m.notes || '등록된 메모가 없습니다.'}
                         title: item.name
                     });
                     
+                    item.markerIndex = successCount;
                     mapExcelMarkers.push(marker);
                     bounds.extend(position);
                     successCount++;
+
+                    // Create floating name label above pin
+                    const labelDiv = document.createElement('div');
+                    labelDiv.style.cssText = 'background: rgba(15, 23, 42, 0.85); color: #fff; padding: 2px 5px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.15); font-size: 10px; font-weight: 700; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,0.3);';
+                    labelDiv.textContent = item.name;
+
+                    const nameLabel = new kakao.maps.CustomOverlay({
+                        position: position,
+                        content: labelDiv,
+                        yAnchor: 2.6,
+                        map: kakaoMap
+                    });
+                    mapExcelNameLabels.push(nameLabel);
 
                     const overlayContent = document.createElement('div');
                     overlayContent.className = 'custom-overlay';
@@ -6659,8 +6685,8 @@ ${m.notes || '등록된 메모가 없습니다.'}
             if (!item.lat) return;
 
             mapExcelOverlays.forEach(o => o.setMap(null));
-            if (mapExcelOverlays[idx]) {
-                mapExcelOverlays[idx].setMap(kakaoMap);
+            if (item.markerIndex !== undefined && mapExcelOverlays[item.markerIndex]) {
+                mapExcelOverlays[item.markerIndex].setMap(kakaoMap);
             }
 
             if (panTo) {
