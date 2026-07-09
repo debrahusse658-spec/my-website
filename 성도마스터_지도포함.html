@@ -6299,10 +6299,10 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 div.onclick = () => focusOnMapMember(m.id);
                 listContainer.appendChild(div);
 
-                let lat = m.lat;
-                let lng = m.lng;
+                let lat = parseFloat(m.lat);
+                let lng = parseFloat(m.lng);
 
-                if (!lat || !lng) {
+                if (isNaN(lat) || isNaN(lng)) {
                     try {
                         const coords = await geocodeAddressPromise(m.address);
                         lat = coords.lat;
@@ -6395,8 +6395,9 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 mapOverlays.push(overlay);
 
                 const memberId = m.id;
+                const index = successCount - 1;
                 kakao.maps.event.addListener(marker, 'click', () => {
-                    focusOnMapMember(memberId);
+                    focusOnMapMember(memberId, index);
                 });
             }
 
@@ -6431,11 +6432,11 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
         }
 
-        function focusOnMapMember(id) {
+        function focusOnMapMember(id, markerIdx = null) {
             const memberIdx = members.findIndex(m => m.id === id);
             if (memberIdx === -1) return;
             const m = members[memberIdx];
-            if (!m.lat || !m.lng) return;
+            if (isNaN(parseFloat(m.lat)) || isNaN(parseFloat(m.lng))) return;
 
             const listItems = document.querySelectorAll('#map-member-list .list-item');
             listItems.forEach(el => el.classList.remove('selected'));
@@ -6445,8 +6446,14 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
 
-            if (m.markerIndex !== undefined && m.markerIndex !== null) {
-                showMapOverlay(m.markerIndex, new kakao.maps.LatLng(m.lat, m.lng), true);
+            let finalMarkerIdx = markerIdx;
+            if (finalMarkerIdx === null || finalMarkerIdx === undefined) {
+                finalMarkerIdx = m.markerIndex;
+            }
+
+            if (finalMarkerIdx !== undefined && finalMarkerIdx !== null && mapMarkers[finalMarkerIdx]) {
+                const pos = mapMarkers[finalMarkerIdx].getPosition();
+                showMapOverlay(finalMarkerIdx, pos, true);
             }
         }
 
