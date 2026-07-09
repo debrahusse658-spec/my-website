@@ -2321,6 +2321,10 @@
                 const data = snapshot.val();
                 if (data) {
                     members = Object.values(data);
+                    members.forEach(m => {
+                        if (m.lat !== undefined && m.lat !== null) m.lat = parseFloat(m.lat);
+                        if (m.lng !== undefined && m.lng !== null) m.lng = parseFloat(m.lng);
+                    });
                     safeStorage.setItem('ssm_members', JSON.stringify(members));
                     filterMembers();
                     renderDashboard();
@@ -2509,6 +2513,10 @@
             const storedMembers = safeStorage.getItem('ssm_members');
             if (storedMembers) {
                 members = JSON.parse(storedMembers);
+                members.forEach(m => {
+                    if (m.lat !== undefined && m.lat !== null) m.lat = parseFloat(m.lat);
+                    if (m.lng !== undefined && m.lng !== null) m.lng = parseFloat(m.lng);
+                });
             } else {
                 members = getSampleMembers();
                 safeStorage.setItem('ssm_members', JSON.stringify(members));
@@ -6391,15 +6399,14 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 mapNameLabels.push(nameLabel);
 
                 const memberId = m.id;
+                const pos = position;
                 kakao.maps.event.addListener(marker, 'click', () => {
-                    focusOnMapMember(memberId, false);
+                    focusOnMapMember(memberId, false, pos);
                 });
             }
 
             if (databaseUpdated) {
-                isSyncingFromFirebase = true;
                 safeStorage.setItem('ssm_members', JSON.stringify(members));
-                isSyncingFromFirebase = false;
             }
 
             if (successCount > 0) {
@@ -6407,11 +6414,10 @@ ${m.notes || '등록된 메모가 없습니다.'}
             }
         }
 
-        function focusOnMapMember(id, forceOpen = false) {
+        function focusOnMapMember(id, forceOpen = false, clickPos = null) {
             const memberIdx = members.findIndex(m => m.id === id);
             if (memberIdx === -1) return;
             const m = members[memberIdx];
-            if (isNaN(parseFloat(m.lat)) || isNaN(parseFloat(m.lng))) return;
 
             // Toggle overlay off if clicked same item and not forced
             if (!forceOpen && mapSelectedIndex === id) {
@@ -6441,6 +6447,14 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 activeMapOverlay.setMap(null);
             }
 
+            let pos = clickPos;
+            if (!pos) {
+                const lat = parseFloat(m.displayLat || m.lat);
+                const lng = parseFloat(m.displayLng || m.lng);
+                if (isNaN(lat) || isNaN(lng)) return;
+                pos = new kakao.maps.LatLng(lat, lng);
+            }
+
             const overlayContent = document.createElement('div');
             overlayContent.className = 'custom-overlay';
             overlayContent.innerHTML = `
@@ -6450,7 +6464,6 @@ ${m.notes || '등록된 메모가 없습니다.'}
                 <button class="btn btn-primary" style="font-size:0.7rem; padding:0.25rem 0.5rem; width:100%; height:auto;" onclick="viewMemberDetailFromMap('${m.id}')">🔍 상세 교적 보기</button>
             `;
 
-            const pos = new kakao.maps.LatLng(m.displayLat || m.lat, m.displayLng || m.lng);
             activeMapOverlay = new kakao.maps.CustomOverlay({
                 content: overlayContent,
                 position: pos,
